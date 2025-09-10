@@ -10,3 +10,6 @@ srcDir        = "src"
 # Dependencies
 
 requires "nim >= 2.0.0"
+
+task docs, "Generate documentaion":
+  exec "nim doc --project --docroot --outdir:htmldocs src/parsesql.nim"
