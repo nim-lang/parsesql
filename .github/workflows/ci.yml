@@ -36,7 +36,7 @@ jobs:
         working-directory: parsesql
 
     steps:
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
       - name: Checkout parsesql
         uses: actions/checkout@v5
         with:
