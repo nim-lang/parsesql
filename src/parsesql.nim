@@ -402,7 +402,7 @@ proc getTok(c: var SqlLexer, tok: var Token) =
     else:
       getSymbol(c, tok)
   of '$':
-    when defined parseSqlAllowPositionalParams:
+    when parseSqlAllowPositionalParams == true:
       if c.buf[c.bufpos + 1] in {'0'..'9'}:
         # Accept positional parameters like $1, $2, $123 as a single identifier token.
         # Otherwise keep existing dollar-quoted string behavior.
