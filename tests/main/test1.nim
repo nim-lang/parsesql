@@ -302,3 +302,20 @@ SELECT `SELECT`, `FROM` as `GROUP` FROM `WHERE`;
 doAssert $parseSql("""
 SELECT "SELECT", "FROM" as "GROUP" FROM "WHERE";
 """) == """select "SELECT", "FROM" as "GROUP" from "WHERE";"""
+
+# parse operators as keywords
+doAssert $(parseSql(
+  """SELECT name FROM users WHERE name NOT LIKE 'Jo%';"""
+)) == "select name from users where name not like 'Jo%';"
+
+doAssert $(parseSql(
+  """SELECT name FROM users WHERE name NOT IN ('John', 'Jane');"""
+)) == """select name from users where name not in ('John', 'Jane');"""
+
+doAssert $(parseSql(
+  """SELECT * FROM products WHERE price NOT BETWEEN 10 AND 20;""")) ==
+  """select * from products where price not between 10 and 20;"""
+
+doAssert $(parseSql(
+  """SELECT * FROM orders WHERE order_date NOT BETWEEN '2023-01-01' AND '2023-12-31';""")) ==
+  """select * from orders where order_date not between '2023-01-01' and '2023-12-31';"""
