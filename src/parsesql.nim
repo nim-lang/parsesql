@@ -477,6 +477,7 @@ type
     nkHexStringLit,
     nkIntegerLit,
     nkNumericLit,
+    nkRaw, # any other literal node kinds should be added here
     nkPrimaryKey,
     nkForeignKey,
     nkNotNull,
@@ -528,12 +529,21 @@ type
     nkCreateTypeIfNotExists,
     nkCreateIndex,
     nkCreateIndexIfNotExists,
+    nkDrop,
+    nkDropIfExists,
+    nkDropTable,
+    nkDropTableIfExists,
+    nkDropType,
+    nkDropTypeIfExists,
+    nkDropIndex,
+    nkDropIndexIfExists,
     nkEnumDef
 
 const
   LiteralNodes = {
     nkIdent, nkQuotedIdent, nkStringLit, nkBitStringLit, nkHexStringLit,
-    nkIntegerLit, nkNumericLit
+    nkIntegerLit, nkNumericLit,
+    nkRaw # any other literal node kinds should be added here
   }
 
 type
@@ -1186,6 +1196,165 @@ proc parseSelect(p: var SqlParser): SqlNode =
     o.add(parseExpr(p))
     result.add(o)
 
+proc addTokRaw(buf: var string, lit: string) =
+  if lit.len == 0: return
+  if buf.len == 0:
+    buf.add(lit)
+    return
+  let prev = buf[^1]
+  let first = lit[0]
+  let noSpaceBefore = first in {'(', '[', ')', ']', ',', '.', ':'}
+  let noSpaceAfterPrev = prev in {'(', '[', '.', ':'}
+  if not noSpaceBefore and not noSpaceAfterPrev:
+    buf.add(' ')
+  buf.add(lit)
+
+proc parseDropTargetRaw(p: var SqlParser): string =
+  var depth = 0
+  while true:
+    if p.tok.kind in {tkEof, tkSemicolon}: break
+    if depth == 0:
+      if p.tok.kind == tkComma: break
+      if isKeyw(p, "cascade") or isKeyw(p, "restrict"): break
+
+    case p.tok.kind
+    of tkParLe, tkBracketLe: inc(depth)
+    of tkParRi, tkBracketRi:
+      if depth > 0: dec(depth)
+    else: discard
+
+    var lit = p.tok.literal
+    if p.tok.kind == tkIdentifier:
+      let lo = lit.toLowerAscii()
+      if lo in ["as", "using", "for", "server", "by", "in"]:
+        lit = lo
+    addTokRaw(result, lit)
+    getTok(p)
+
+proc parseDropObjectType(p: var SqlParser): string =
+  if isKeyw(p, "access"):
+    getTok(p); eat(p, "method"); result = "access method"
+  elif isKeyw(p, "aggregate"):
+    getTok(p); result = "aggregate"
+  elif isKeyw(p, "cast"):
+    getTok(p); result = "cast"
+  elif isKeyw(p, "collation"):
+    getTok(p); result = "collation"
+  elif isKeyw(p, "conversion"):
+    getTok(p); result = "conversion"
+  elif isKeyw(p, "database"):
+    getTok(p); result = "database"
+  elif isKeyw(p, "domain"):
+    getTok(p); result = "domain"
+  elif isKeyw(p, "event"):
+    getTok(p); eat(p, "trigger"); result = "event trigger"
+  elif isKeyw(p, "extension"):
+    getTok(p); result = "extension"
+  elif isKeyw(p, "foreign"):
+    getTok(p)
+    if isKeyw(p, "data"):
+      getTok(p); eat(p, "wrapper"); result = "foreign data wrapper"
+    elif isKeyw(p, "table"):
+      getTok(p); result = "foreign table"
+    else:
+      sqlError(p, "DATA or TABLE expected after FOREIGN")
+  elif isKeyw(p, "function"):
+    getTok(p); result = "function"
+  elif isKeyw(p, "group"):
+    getTok(p); result = "group"
+  elif isKeyw(p, "index"):
+    getTok(p); result = "index"
+  elif isKeyw(p, "language"):
+    getTok(p); result = "language"
+  elif isKeyw(p, "materialized"):
+    getTok(p); eat(p, "view"); result = "materialized view"
+  elif isKeyw(p, "operator"):
+    getTok(p)
+    if isKeyw(p, "class"):
+      getTok(p); result = "operator class"
+    elif isKeyw(p, "family"):
+      getTok(p); result = "operator family"
+    else:
+      result = "operator"
+  elif isKeyw(p, "owned"):
+    getTok(p); result = "owned"
+  elif isKeyw(p, "policy"):
+    getTok(p); result = "policy"
+  elif isKeyw(p, "procedure"):
+    getTok(p); result = "procedure"
+  elif isKeyw(p, "publication"):
+    getTok(p); result = "publication"
+  elif isKeyw(p, "role"):
+    getTok(p); result = "role"
+  elif isKeyw(p, "routine"):
+    getTok(p); result = "routine"
+  elif isKeyw(p, "rule"):
+    getTok(p); result = "rule"
+  elif isKeyw(p, "schema"):
+    getTok(p); result = "schema"
+  elif isKeyw(p, "sequence"):
+    getTok(p); result = "sequence"
+  elif isKeyw(p, "server"):
+    getTok(p); result = "server"
+  elif isKeyw(p, "statistics"):
+    getTok(p); result = "statistics"
+  elif isKeyw(p, "subscription"):
+    getTok(p); result = "subscription"
+  elif isKeyw(p, "table"):
+    getTok(p); result = "table"
+  elif isKeyw(p, "tablespace"):
+    getTok(p); result = "tablespace"
+  elif isKeyw(p, "text"):
+    getTok(p); eat(p, "search")
+    if isKeyw(p, "configuration"):
+      getTok(p); result = "text search configuration"
+    elif isKeyw(p, "dictionary"):
+      getTok(p); result = "text search dictionary"
+    elif isKeyw(p, "parser"):
+      getTok(p); result = "text search parser"
+    elif isKeyw(p, "template"):
+      getTok(p); result = "text search template"
+    else:
+      sqlError(p, "CONFIGURATION, DICTIONARY, PARSER or TEMPLATE expected")
+  elif isKeyw(p, "transform"):
+    getTok(p); result = "transform"
+  elif isKeyw(p, "trigger"):
+    getTok(p); result = "trigger"
+  elif isKeyw(p, "type"):
+    getTok(p); result = "type"
+  elif isKeyw(p, "user"):
+    getTok(p)
+    if isKeyw(p, "mapping"):
+      getTok(p); result = "user mapping"
+    else:
+      result = "user"
+  elif isKeyw(p, "view"):
+    getTok(p); result = "view"
+  else:
+    sqlError(p, "unsupported DROP object type")
+
+proc parseDrop(p: var SqlParser, objectType: string): SqlNode =
+  if isKeyw(p, "if"):
+    getTok(p)
+    eat(p, "exists")
+    result = newNode(nkDropIfExists)
+  else:
+    result = newNode(nkDrop)
+  result.add(newNode(nkRaw, objectType))
+  while true:
+    let target = parseDropTargetRaw(p)
+    if target.len == 0:
+      break
+    result.add(newNode(nkRaw, target))
+    if p.tok.kind == tkComma:
+      getTok(p)
+    else:
+      break
+  if result.len < 2:
+    sqlError(p, "object name/signature expected")
+  if isKeyw(p, "cascade") or isKeyw(p, "restrict"):
+    getTok(p)
+
 proc parseStmt(p: var SqlParser; parent: SqlNode) =
   if isKeyw(p, "create"):
     getTok(p)
@@ -1205,6 +1374,10 @@ proc parseStmt(p: var SqlParser; parent: SqlNode) =
       parent.add parseIndexDef(p)
     else:
       sqlError(p, "TABLE expected")
+  elif isKeyw(p, "drop"):
+    getTok(p) # consume DROP
+    let objectType = parseDropObjectType(p)
+    parent.add parseDrop(p, objectType)
   elif isKeyw(p, "insert"):
     parent.add parseInsert(p)
   elif isKeyw(p, "update"):
@@ -1216,7 +1389,7 @@ proc parseStmt(p: var SqlParser; parent: SqlNode) =
   elif isKeyw(p, "begin"):
     getTok(p)
   else:
-    sqlError(p, "SELECT, CREATE, UPDATE or DELETE expected")
+    sqlError(p, "SELECT, CREATE, UPDATE or DELETE expected. Got " & p.tok.literal)
 
 proc parse(p: var SqlParser): SqlNode =
   ## parses the content of `p`'s input stream and returns the SQL AST.
@@ -1303,6 +1476,8 @@ proc ra(n: SqlNode, s: var SqlWriter) =
   if n == nil: return
   case n.kind
   of nkNone: discard
+  of nkRaw:
+    s.add(n.strVal)
   of nkIdent:
     if allCharsInSet(n.strVal, {'\33'..'\127'}):
       s.add(n.strVal)
@@ -1526,6 +1701,29 @@ proc ra(n: SqlNode, s: var SqlWriter) =
       if i > 2: s.add(", ")
       ra(n.sons[i], s)
     s.add(");")
+  of nkDrop, nkDropIfExists:
+    s.addKeyw("drop")
+    ra(n.sons[0], s) # object type
+    if n.kind == nkDropIfExists:
+      s.addKeyw("if exists")
+    for i in 1 ..< n.len:
+      if i > 1: s.add(',')
+      ra(n.sons[i], s)
+  of nkDropTable, nkDropTableIfExists:
+    s.addKeyw("drop table")
+    if n.kind == nkDropTableIfExists:
+      s.addKeyw("if exists")
+    s.addMulti(n)
+  of nkDropType, nkDropTypeIfExists:
+    s.addKeyw("drop type")
+    if n.kind == nkDropTypeIfExists:
+      s.addKeyw("if exists")
+    s.addMulti(n)
+  of nkDropIndex, nkDropIndexIfExists:
+    s.addKeyw("drop index")
+    if n.kind == nkDropIndexIfExists:
+      s.addKeyw("if exists")
+    s.addMulti(n)
   of nkEnumDef:
     s.addKeyw("enum")
     rs(n, s)

@@ -2,7 +2,7 @@ discard """
   matrix: "--mm:refc; --mm:orc"
   targets: "c js"
 """
-import parsesql
+import ../../src/parsesql
 import std/assertions
 
 doAssert treeRepr(parseSql("INSERT INTO STATS VALUES (10, 5.5); ")
@@ -302,3 +302,41 @@ SELECT `SELECT`, `FROM` as `GROUP` FROM `WHERE`;
 doAssert $parseSql("""
 SELECT "SELECT", "FROM" as "GROUP" FROM "WHERE";
 """) == """select "SELECT", "FROM" as "GROUP" from "WHERE";"""
+
+
+# DROP TABLE / TYPE / INDEX
+doAssert $parseSql("DROP TABLE myTable;") == "drop table myTable;"
+doAssert $parseSql("DROP TYPE myType;") == "drop type myType;"
+doAssert $parseSql("DROP INDEX myIndex;") == "drop index myIndex;"
+
+# IF EXISTS
+doAssert $parseSql("DROP TABLE IF EXISTS myTable;") == "drop table if exists myTable;"
+doAssert $parseSql("DROP TYPE IF EXISTS myType;") == "drop type if exists myType;"
+doAssert $parseSql("DROP INDEX IF EXISTS myIndex;") == "drop index if exists myIndex;"
+
+# Multi-object list
+doAssert $parseSql("DROP TABLE IF EXISTS a, b, c;") == "drop table if exists a, b, c;"
+doAssert $parseSql("DROP TYPE IF EXISTS t1, t2;") == "drop type if exists t1, t2;"
+doAssert $parseSql("DROP INDEX IF EXISTS i1, i2;") == "drop index if exists i1, i2;"
+
+# Optional suffix
+doAssert $parseSql("DROP TABLE IF EXISTS a CASCADE;") == "drop table if exists a;"
+doAssert $parseSql("DROP TYPE IF EXISTS t RESTRICT;") == "drop type if exists t;"
+doAssert $parseSql("DROP INDEX IF EXISTS i CASCADE;") == "drop index if exists i;"
+
+# Multiple statements
+doAssert $parseSql("""DROP TABLE IF EXISTS myTable;
+DROP TYPE IF EXISTS myType;""") == "drop table if exists myTable; drop type if exists myType;"
+
+# Other DROP statements
+doAssert $parseSql("DROP ACCESS METHOD am;") == "drop access method am;"
+doAssert $parseSql("DROP AGGREGATE f(int);") == "drop aggregate f(int);"
+doAssert $parseSql("DROP CAST (int AS text);") == "drop cast (int as text);"
+doAssert $parseSql("DROP EVENT TRIGGER trg;") == "drop event trigger trg;"
+doAssert $parseSql("DROP FOREIGN DATA WRAPPER fdw1;") == "drop foreign data wrapper fdw1;"
+doAssert $parseSql("DROP MATERIALIZED VIEW mv;") == "drop materialized view mv;"
+doAssert $parseSql("DROP OPERATOR CLASS opc USING btree;") == "drop operator class opc using btree;"
+doAssert $parseSql("DROP OWNED BY CURRENT_USER;") == "drop owned by CURRENT_USER;"
+doAssert $parseSql("DROP TEXT SEARCH CONFIGURATION cfg;") == "drop text search configuration cfg;"
+doAssert $parseSql("DROP USER MAPPING FOR PUBLIC SERVER s1;") == "drop user mapping for PUBLIC server s1;"
+
