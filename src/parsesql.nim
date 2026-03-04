@@ -1723,6 +1723,7 @@ proc ra(n: SqlNode, s: var SqlWriter) =
     s.addKeyw("drop index")
     if n.kind == nkDropIndexIfExists:
       s.addKeyw("if exists")
+    s.addMulti(n)
   of nkEnumDef:
     s.addKeyw("enum")
     rs(n, s)
