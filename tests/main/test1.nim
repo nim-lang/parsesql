@@ -2,7 +2,7 @@ discard """
   matrix: "--mm:refc; --mm:orc"
   targets: "c js"
 """
-import parsesql
+import ../../src/parsesql
 import std/assertions
 
 doAssert treeRepr(parseSql("INSERT INTO STATS VALUES (10, 5.5); ")
@@ -302,3 +302,10 @@ SELECT `SELECT`, `FROM` as `GROUP` FROM `WHERE`;
 doAssert $parseSql("""
 SELECT "SELECT", "FROM" as "GROUP" FROM "WHERE";
 """) == """select "SELECT", "FROM" as "GROUP" from "WHERE";"""
+
+# parse positional parameters
+doAssert $parseSql("""SELECT * FROM table WHERE id = $1 AND name = $2;
+""") == "select * from table where id = $1 and name = $2;" 
+
+doAssert $parseSql("""INSERT INTO table (id, name) VALUES ($1, $2);
+""") == "insert into table (id , name ) values ($1 , $2 );"

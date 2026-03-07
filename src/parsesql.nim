@@ -63,7 +63,7 @@ const
     "select", "from", "where", "group", "limit", "offset", "having",
     # functions
     "count",
-  ]
+  ] 
 
 proc close(L: var SqlLexer) =
   lexbase.close(L)
@@ -398,7 +398,20 @@ proc getTok(c: var SqlLexer, tok: var Token) =
       getBitHexString(c, tok, {'a'..'f', 'A'..'F', '0'..'9'})
     else:
       getSymbol(c, tok)
-  of '$': getDollarString(c, tok)
+  of '$':
+    if c.buf[c.bufpos + 1] in {'0'..'9'}:
+      # Accept positional parameters like $1, $2, $123 as a single identifier token.
+      # Otherwise keep existing dollar-quoted string behavior.
+      var pos = c.bufpos
+      add(tok.literal, c.buf[pos]) # leading $
+      inc(pos)
+      # read one or more digits
+      while c.buf[pos] in {'0'..'9'}:
+        add(tok.literal, c.buf[pos])
+        inc(pos)
+      c.bufpos = pos
+      tok.kind = tkIdentifier
+    else: getDollarString(c, tok)
   of '[':
     tok.kind = tkBracketLe
     inc(c.bufpos)
