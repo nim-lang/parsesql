@@ -65,6 +65,9 @@ const
     "count",
   ]
 
+  strOperators = ["not like", "not in", "not between", "like", "in", "between",
+                    "is", "and", "or", "=", "<", ">", "<=", ">=", "<>", "!="]
+
 proc close(L: var SqlLexer) =
   lexbase.close(L)
 
@@ -665,7 +668,10 @@ proc getPrecedence(p: SqlParser): int =
     result = 5
   elif isOpr(p, "=") or isOpr(p, "<") or isOpr(p, ">") or isOpr(p, ">=") or
        isOpr(p, "<=") or isOpr(p, "<>") or isOpr(p, "!=") or isKeyw(p, "is") or
-       isKeyw(p, "like") or isKeyw(p, "in"):
+       isKeyw(p, "like") or isKeyw(p, "in") or
+       (isKeyw(p, "not") and p.tok.kind == tkIdentifier and
+        cmpIgnoreCase(p.tok.literal, "not") == 0 and
+        p.tok.literal.len > 0):
     result = 4
   elif isKeyw(p, "and"):
     result = 3
@@ -769,8 +775,25 @@ proc lowestExprAux(p: var SqlParser, v: out SqlNode, limit: int): int =
   result = opPred
   while opPred > limit:
     node = newNode(nkInfix)
-    opNode = newNode(nkIdent, p.tok.literal.toLowerAscii())
-    getTok(p)
+    # Handle NOT LIKE, NOT IN, NOT BETWEEN
+    if isKeyw(p, "not"):
+      let saveTok = p.tok
+      getTok(p)
+      if isKeyw(p, "like"):
+        opNode = newNode(nkIdent, "not like")
+        getTok(p)
+      elif isKeyw(p, "in"):
+        opNode = newNode(nkIdent, "not in")
+        getTok(p)
+      elif isKeyw(p, "between"):
+        opNode = newNode(nkIdent, "not between")
+        getTok(p)
+      else:
+        # Just NOT as prefix
+        opNode = newNode(nkIdent, "not")
+    else:
+      opNode = newNode(nkIdent, p.tok.literal.toLowerAscii())
+      getTok(p)
     result = lowestExprAux(p, v2, opPred)
     node.add(opNode)
     node.add(v)
@@ -1344,7 +1367,13 @@ proc ra(n: SqlNode, s: var SqlWriter) =
   of nkInfix:
     ra(n.sons[1], s)
     s.add(' ')
-    ra(n.sons[0], s)
+    # Render operator as keyword if it matches known SQL operators
+    let opStr = n.sons[0].strVal.toLowerAscii()
+    case opStr
+    of strOperators:
+      s.addKeyw(opStr)
+    else:
+      ra(n.sons[0], s)
     s.add(' ')
     ra(n.sons[2], s)
   of nkCall, nkColumnReference:
