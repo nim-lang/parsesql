@@ -757,6 +757,8 @@ proc primary(p: var SqlParser): SqlNode =
     of tkParLe:
       var a = result
       result = newNode(nkCall)
+      if a.kind == nkIdent:
+        a.strVal = a.strVal.toLowerAscii() # function names are case insensitive in SQL
       result.add(a)
       getTok(p)
       while p.tok.kind != tkParRi:
