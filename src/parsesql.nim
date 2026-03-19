@@ -739,7 +739,8 @@ proc primary(p: var SqlParser): SqlNode =
       # Parse subquery as an expression
       let subq = parseSelect(p)
       eat(p, tkParRi)
-      result = subq
+      result = newNode(nkPrGroup)
+      result.add(subq)
       return
     else:
       # Regular parenthesis group
@@ -1378,6 +1379,10 @@ proc ra(n: SqlNode, s: var SqlWriter) =
       ra(n.sons[i], s)
     s.add(')')
   of nkPrGroup:
+    if n.len > 0 and n.sons[0].kind == nkSelect:
+      # Only add space if the group is a
+      # subquery (where first child is a SELECT)
+      s.add(' ')
     s.add('(')
     s.addMulti(n)
     s.add(')')

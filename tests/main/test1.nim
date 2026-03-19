@@ -305,15 +305,11 @@ SELECT "SELECT", "FROM" as "GROUP" FROM "WHERE";
 
 
 # parse subqueries in FROM clause
-let subquery1 = """
+doAssert $parseSql("""
 SELECT 
   posts.*,
   (SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comments_count,
   (SELECT COUNT(*) FROM views WHERE views.post_id = posts.id) AS views_count
 FROM posts
 ORDER BY posts.created_at DESC;
-"""
-
-echo parseSql(subquery1)
-
-# doAssert $parseSql(subquery1) == """select posts.*, (select count(*) from comments where comments.post_id = posts.id) as comments_count, (select count(*) from views where views.post_id = posts.id) as views_count from posts order by posts.created_at desc;"""
+""") == """select posts.*, (select count(*) from comments where comments.post_id = posts.id) as comments_count, (select count(*) from views where views.post_id = posts.id) as views_count from posts order by posts.created_at desc;"""
