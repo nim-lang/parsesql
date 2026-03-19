@@ -730,12 +730,36 @@ proc primary(p: var SqlParser): SqlNode =
     getTok(p)
     result.add(primary(p))
     return
+
+  # Subquery support (SELECT ...)
+  if p.tok.kind == tkParLe:
+    let savePos = p.tok
+    getTok(p)
+    if isKeyw(p, "select"):
+      # Parse subquery as an expression
+      let subq = parseSelect(p)
+      eat(p, tkParRi)
+      result = newNode(nkPrGroup)
+      result.add(subq)
+      return
+    else:
+      # Regular parenthesis group
+      result = newNode(nkPrGroup)
+      result.add(parseExpr(p))
+      while p.tok.kind == tkComma:
+        getTok(p)
+        result.add(parseExpr(p))
+      eat(p, tkParRi)
+      return
+
   result = identOrLiteral(p)
   while true:
     case p.tok.kind
     of tkParLe:
       var a = result
       result = newNode(nkCall)
+      if a.kind == nkIdent:
+        a.strVal = a.strVal.toLowerAscii() # function names are case insensitive in SQL
       result.add(a)
       getTok(p)
       while p.tok.kind != tkParRi:
@@ -1355,6 +1379,10 @@ proc ra(n: SqlNode, s: var SqlWriter) =
       ra(n.sons[i], s)
     s.add(')')
   of nkPrGroup:
+    if n.len > 0 and n.sons[0].kind == nkSelect:
+      # Only add space if the group is a
+      # subquery (where first child is a SELECT)
+      s.add(' ')
     s.add('(')
     s.addMulti(n)
     s.add(')')
