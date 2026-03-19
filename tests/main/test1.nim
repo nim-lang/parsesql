@@ -2,7 +2,7 @@ discard """
   matrix: "--mm:refc; --mm:orc"
   targets: "c js"
 """
-import parsesql
+import ../src/parsesql
 import std/assertions
 
 doAssert treeRepr(parseSql("INSERT INTO STATS VALUES (10, 5.5); ")
@@ -302,3 +302,16 @@ SELECT `SELECT`, `FROM` as `GROUP` FROM `WHERE`;
 doAssert $parseSql("""
 SELECT "SELECT", "FROM" as "GROUP" FROM "WHERE";
 """) == """select "SELECT", "FROM" as "GROUP" from "WHERE";"""
+
+
+# parse subqueries in FROM clause
+let subquery1 = """
+SELECT 
+  posts.*,
+  (SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comments_count,
+  (SELECT COUNT(*) FROM views WHERE views.post_id = posts.id) AS views_count
+FROM posts
+ORDER BY posts.created_at DESC;
+"""
+
+doAssert $parseSql(subquery1) == """select posts.*, (select count(*) from comments where comments.post_id = posts.id) as comments_count, (select count(*) from views where views.post_id = posts.id) as views_count from posts order by posts.created_at desc;"""

@@ -730,6 +730,27 @@ proc primary(p: var SqlParser): SqlNode =
     getTok(p)
     result.add(primary(p))
     return
+
+  # Subquery support (SELECT ...)
+  if p.tok.kind == tkParLe:
+    let savePos = p.tok
+    getTok(p)
+    if isKeyw(p, "select"):
+      # Parse subquery as an expression
+      let subq = parseSelect(p)
+      eat(p, tkParRi)
+      result = subq
+      return
+    else:
+      # Regular parenthesis group
+      result = newNode(nkPrGroup)
+      result.add(parseExpr(p))
+      while p.tok.kind == tkComma:
+        getTok(p)
+        result.add(parseExpr(p))
+      eat(p, tkParRi)
+      return
+
   result = identOrLiteral(p)
   while true:
     case p.tok.kind
